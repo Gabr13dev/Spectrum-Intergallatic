@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Intergalactic Spectrum — Final</title>
+
+<!-- Font Awesome -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+
+<style>
+  :root{
+    --cols: 14;          /* 7 L + 7 R */
+    --rows: 13;          /* “andares” (topo = pico vermelho) */
+    --dots-per-row: 4;   /* LEDs por andar */
+    --gap-col: 10px;
+    --gap-row: 6px;
+    --dot-size: 8px;
+    --bg: #171a1f;
+
+    --led-off: #2b3240;
+    --led-on:  #e8eef8;
+    --led-peak:#ff4d4d;
+
+    --accent: #ff9f43;   /* laranja para hover */
+    --accent-glow: rgba(255,159,67,.55);
+  }
+
+  html,body{height:100%}
+  body{
+    margin:0; display:grid; grid-template-rows: 1fr auto;
+    background:#0d1016; color:#cfd8e3; font:500 14px/1.35 ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;
+  }
+
+  .rack{ display:grid; place-items:center; padding:28px 18px }
+  .window{
+    width:min(1100px,94vw);
+    background:linear-gradient(180deg,#0f1420,#0a0f18);
+    border:1px solid #222a3a; border-radius:16px; padding:18px 14px 14px;
+    box-shadow:0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .panel{
+    background:var(--bg); border:1px solid #1f2636; border-radius:12px; padding:14px 14px 6px;
+    position:relative; overflow:hidden;
+  }
+  .divider{
+    position:absolute; left:50%; top:10px; bottom:64px; width:2px; transform:translateX(-1px);
+    background:linear-gradient(to bottom, transparent, rgba(120,160,255,.18) 35%, rgba(120,160,255,.18) 65%, transparent);
+    pointer-events:none;
+    height: 190px;
+  }
+  /* Hz no pé do divider (altura dos channelLabel) */
+  .dividerHz{
+    position:absolute; left:50%; transform:translateX(-50%);
+    bottom:26px; /* ~altura dos channelLabel; ajuste fino se quiser */
+    font:700 11px/1 "Courier New", ui-monospace, monospace;
+    color:#9fb0c6; text-shadow:0 0 4px rgba(200,220,255,.25);
+    pointer-events:none; user-select:none;
+    top: 207px;
+  }
+
+  .spectrum{ display:grid; grid-template-columns: repeat(var(--cols), 1fr); gap: var(--gap-col); }
+  .col{ display:grid; grid-template-rows: repeat(var(--rows), 1fr) 22px; gap: var(--gap-row); align-items:end; }
+  .row{
+    display:grid; grid-template-columns: repeat(var(--dots-per-row), var(--dot-size));
+    justify-content:center; gap:6px;
+  }
+  .dot{
+    width:var(--dot-size); height:var(--dot-size); border-radius:50%;
+    background:var(--led-off);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset, 0 1px 3px rgba(0,0,0,.6);
+    transition: background .08s linear, transform .08s linear;
+  }
+  .dot.on{ background:var(--led-on) }
+  .dot.peak{ background:var(--led-peak) }
+  .dot.on, .dot.peak{ box-shadow:
+      0 0 6px rgba(255,255,255,.25),
+      0 0 0 1px rgba(255,255,255,.08) inset,
+      0 1px 3px rgba(0,0,0,.6)
+  }
+  .channelLabel{
+    align-self:end; text-align:center; color:#9fb0c6; font-size:11px; letter-spacing:.02em; margin-top:4px;
+  }
+
+  /* balance */
+  #balanceWrap{ margin:10px auto 0; width:76%; height:8px; position:relative }
+  #balanceTrack{
+    height:6px; border-radius:999px; background:#222e42; border:1px solid #2b3a52;
+    box-shadow: inset 0 0 8px rgba(255,255,255,.06);
+  }
+  #balanceThumb{
+    --bal: -0.9;
+    position:absolute; top:-4px; left:50%;
+    transform: translateX(calc(var(--bal) * 50 * 1%));
+    width:2px; height:14px; background: var(--accent);
+    transition: transform .06s linear;
+  }
+
+  .balanceLabel{
+    position:absolute;
+    top:50%; transform:translateY(-50%);
+    font:900 12px/1 "Courier New", ui-monospace, monospace;
+    letter-spacing:.18em; color:#9fb0c6;
+    text-shadow:0 0 6px rgba(200,220,255,.25);
+    pointer-events:none; user-select:none;
+  }
+  .balanceLabel.left{  left:-22px; }
+  .balanceLabel.right{ right:-22px; }
+
+  /* display inferior */
+  .displayBar{
+    display:grid; grid-template-columns: auto 1fr auto auto;
+    align-items:center; gap:14px;
+    margin:16px 10px 0; padding:10px 12px;
+    border:1px solid #1f2a38; border-radius:10px;
+    background:linear-gradient(180deg,#0e1420,#0a0f18);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .btn-disc{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 12px; font-weight:700; letter-spacing:.12em; color:#cfe1ff;
+    background:#1b2330; border:1px solid #2b3950; border-radius:8px; cursor:pointer;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  }
+  .btn-disc:hover{
+    border-color: var(--accent);
+    box-shadow: 0 0 18px var(--accent-glow), inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .cdIcon{
+    scale: 1.5;
+    color: var(--accent);
+    transition: transform .4s ease, filter .2s ease;
+  }
+  .cdIcon.spinning{ animation: spin 1.2s linear infinite }
+  @keyframes spin{ to{ transform: rotate(360deg) } }
+
+  .marqueeStack{ display:grid; gap:4px }
+  .marqueeWrap{ overflow:hidden; white-space:nowrap; position:relative; min-height:20px; }
+  .ledText{
+    color:#e8eef8;
+    text-shadow: 0 0 6px rgba(232,238,248,.35), 0 0 12px rgba(232,238,248,.15);
+    font:900 14px/1.2 "Courier New", ui-monospace, monospace;
+    letter-spacing:.12em; text-transform:uppercase;
+  }
+  .ledMarquee{ display:inline-block; padding-left:100%; animation: scrollMarquee 14s linear infinite; }
+  @keyframes scrollMarquee{ from{transform:translateX(0)} to{transform:translateX(-100%)} }
+  .cdTrackLine{ font-size:12px; opacity:.9; letter-spacing:.18em }
+
+  .timeControls{ display:flex; align-items:center; gap:10px }
+  .timeWrap{
+    display:flex; align-items:center; gap:6px;
+    font:700 13px/1 "Courier New", ui-monospace, monospace;
+    color:#b8c7db; letter-spacing:.08em;
+  }
+  .timeWrap .sep{ opacity:.5 }
+
+  .btnCtl{
+    width:40px; height:32px; border-radius:8px;
+    display:grid; place-items:center;
+    background:#1b2330; border:1px solid #2b3950; cursor:pointer;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+    transition: box-shadow .12s ease, border-color .12s ease, transform .08s ease;
+  }
+  .btnCtl i{ color:#dfe9ff; font-size:16px; filter: drop-shadow(0 0 6px rgba(200,220,255,.25)); transition: color .12s ease }
+  .btnCtl:hover{ border-color: var(--accent); box-shadow: 0 0 16px var(--accent-glow), inset 0 0 0 1px rgba(255,255,255,.06) }
+  .btnCtl:hover i{ color: var(--accent) }
+
+  /* SEEK BAR (track bar) */
+  .seekWrap{
+    grid-column: 1 / -1;   /* ocupa a linha inteira, abaixo dos botões */
+    margin-top: 10px;
+  }
+  #seek{
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:8px; border-radius:999px;
+    background:#222e42; border:1px solid #2b3a52;
+    box-shadow: inset 0 0 8px rgba(255,255,255,.06);
+    outline:none;
+  }
+  #seek::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:24px; height:14px; border-radius:12px;
+    background: var(--accent); border:2px solid #17202f;
+    box-shadow: 0 0 12px var(--accent-glow);
+    cursor:pointer;
+  }
+  #seek::-moz-range-thumb{
+    width:24px; height:14px; border-radius:12px;
+    background: var(--accent); border:2px solid #17202f;
+    box-shadow: 0 0 12px var(--accent-glow);
+    cursor:pointer;
+  }
+
+  .footer{ padding:10px 14px; color:#93a4bb; background:#0f1218; border-top:1px solid #202633 }
+
+  @media (max-width:820px){
+    .displayBar{ grid-template-columns: 1fr; gap:10px }
+    .timeControls{ justify-content:space-between }
+    .ledMarquee{ animation-duration: 18s }
+  }
+</style>
+</head>
+<body>
+
+  <div class="rack">
+    <div class="window">
+      <div class="panel">
+        <span class="divider" aria-hidden="true"></span>
+        <span class="dividerHz">Hz</span>
+
+        <div id="spectrum" class="spectrum"></div>
+
+        <div id="balanceWrap" aria-hidden="true">
+            <span class="balanceLabel left">L</span>
+            <div id="balanceTrack"></div>
+            <div id="balanceThumb"></div>
+            <span class="balanceLabel right">R</span>
+        </div>
+
+        <div class="displayBar">
+          <button id="discBtn" class="btn-disc" aria-label="Load Disc">
+            <i id="cdIcon" class="cdIcon fa-solid fa-compact-disc"></i>
+            LOAD&nbsp;DISC
+          </button>
+
+          <div class="marqueeStack">
+            <div class="marqueeWrap" aria-live="polite">
+              <div id="marquee" class="ledText ledMarquee">— no disc —</div>
+            </div>
+            <div id="cdTrack" class="ledText cdTrackLine">CD 13/92 — TRACK 07</div>
+          </div>
+
+          <div class="timeControls">
+            <div class="timeWrap">
+              <span id="timeNow">00:00</span>
+              <span class="sep">/</span>
+              <span id="timeTotal">00:00</span>
+            </div>
+            <!-- BOTÃO ÚNICO TOGGLE PLAY/PAUSE -->
+            <button id="btnToggle" class="btnCtl" title="Play/Pause">
+              <i id="toggleIcon" class="fa-solid fa-play"></i>
+            </button>
+            <button id="btnStop"  class="btnCtl" title="Stop">
+              <i class="fa-solid fa-stop"></i>
+            </button>
+          </div>
+
+          <!-- SEEK BAR -->
+          <div class="seekWrap">
+            <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek">
+          </div>
+
+          <input id="filePick" type="file" accept="audio/*" hidden>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Dica: carregue uma música estéreo (LOAD DISC) pra ver L e R reagindo separados.</div>
+
+  <audio id="audio"></audio>
+
+<script>
+/* ======= construção da matriz ======= */
+const css = getComputedStyle(document.documentElement);
+const COLS = parseInt(css.getPropertyValue('--cols')) || 14;
+const ROWS = parseInt(css.getPropertyValue('--rows')) || 13;
+const DOTS = parseInt(css.getPropertyValue('--dots-per-row')) || 4;
+
+const elSpectrum = document.getElementById('spectrum');
+const columns = [];
+for (let c = 0; c < COLS; c++){
+  const col = document.createElement('div'); col.className = 'col';
+  const rows = [];
+  for (let r = 0; r < ROWS; r++){
+    const row = document.createElement('div'); row.className = 'row';
+    for (let d = 0; d < DOTS; d++){ row.appendChild(Object.assign(document.createElement('span'),{className:'dot'})); }
+    rows.push(row); col.appendChild(row);
+  }
+  const lab = document.createElement('span'); lab.className = 'channelLabel';
+  lab.textContent = ['63','160','400','1k','2.5k','6.3k','16k'][(c)%7];
+  col.appendChild(lab);
+  columns.push(rows); elSpectrum.appendChild(col);
+}
+function paintColumn(ci, level, peak){
+  const rows = columns[ci], n = rows.length;
+  const L = Math.max(0, Math.min(ROWS, level));
+  const P = Math.max(0, Math.min(ROWS, peak ?? L));
+  for (let r = 0; r < n; r++){
+    const row = rows[n-1-r], on = r < L;
+    for (const dot of row.children){ dot.classList.toggle('on', on); dot.classList.remove('peak'); }
+  }
+  if (P>0){ for (const dot of rows[n-P].children){ dot.classList.add('peak'); } }
+}
+
+/* ======= Web Audio: medidores rápidos ======= */
+const audioEl   = document.getElementById('audio');
+const cdIconEl  = document.getElementById('cdIcon');
+
+let audioCtx, srcNode, splitter, analyserL, analyserR, dataL, dataR, rafId;
+const FFT_SIZE   = 1024;
+const SMOOTHING  = 0.55;
+let   DECAY      = 0.00;
+const PEAK_HOLD  = 13;
+
+const BANDS = [63,160,400,1000,2500,6300,16000];
+const EDGES = [45,90,250,630,1600,4000,10000,20000];
+var thumb_last_value = 1;
+
+const state = Array.from({length: COLS}, () => ({display:0, peak:0, hold:0}));
+
+function ensureCtx(){ if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+function disconnect(){
+  if (rafId) cancelAnimationFrame(rafId);
+  try{ srcNode?.disconnect(); splitter?.disconnect(); analyserL?.disconnect(); analyserR?.disconnect(); }catch(e){}
+}
+function connectElement(){
+  ensureCtx(); disconnect();
+  srcNode  = audioCtx.createMediaElementSource(audioEl);
+  splitter = audioCtx.createChannelSplitter(2);
+  analyserL = audioCtx.createAnalyser(); analyserR = audioCtx.createAnalyser();
+  for (const an of [analyserL, analyserR]){
+    an.fftSize = FFT_SIZE; an.smoothingTimeConstant = SMOOTHING; an.minDecibels=-90; an.maxDecibels=-10;
+  }
+  srcNode.connect(splitter); splitter.connect(analyserL,0); splitter.connect(analyserR,1);
+  srcNode.connect(audioCtx.destination);
+  dataL = new Uint8Array(analyserL.frequencyBinCount);
+  dataR = new Uint8Array(analyserR.frequencyBinCount);
+  startLoop();
+}
+function binsFor(an, f1,f2){
+  const nyq = audioCtx.sampleRate/2, N=an.frequencyBinCount, step=nyq/N;
+  const s = Math.max(0, Math.floor(f1/step)), e = Math.min(N-1, Math.ceil(f2/step));
+  return [s,e];
+}
+function levelsFor(an, data){
+  an.getByteFrequencyData(data);
+  const out=[];
+  for (let i=0;i<BANDS.length;i++){
+    const [b0,b1]=binsFor(an,EDGES[i],EDGES[i+1]);
+    let sum=0; for(let b=b0;b<=b1;b++) sum+=data[b];
+    const avg = sum/Math.max(1,(b1-b0+1));
+    const lvl = Math.round((avg/255)*ROWS);
+    out.push(Math.max(0, Math.min(ROWS, lvl)));
+  }
+  return out;
+}
+const timeL = new Uint8Array(FFT_SIZE), timeR = new Uint8Array(FFT_SIZE);
+function rms(an, buf){ an.getByteTimeDomainData(buf); let acc=0; for(let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; acc+=v*v; } return Math.sqrt(acc/buf.length); }
+
+function draw(){
+  const lvL = levelsFor(analyserL, dataL);
+  const lvR = levelsFor(analyserR, dataR);
+
+  for (let i=0;i<7;i++){
+    const sL=state[i]; const targetL=lvL[i];
+    sL.display = targetL;
+    if (sL.display > sL.peak){ sL.peak=sL.display; sL.hold=PEAK_HOLD; } else if (sL.hold>0){ sL.hold--; } else { sL.peak=Math.max(0,sL.peak-1); }
+    paintColumn(i, sL.display, sL.peak);
+
+    const sR=state[7+i]; const targetR=lvR[i];
+    sR.display = targetR;
+    if (sR.display > sR.peak){ sR.peak=sR.display; sR.hold=PEAK_HOLD; } else if (sR.hold>0){ sR.hold--; } else { sR.peak=Math.max(0,sR.peak-1); }
+    paintColumn(7+i, sR.display, sR.peak);
+  }
+
+  // balance
+  const rl=rms(analyserL,timeL), rr=rms(analyserR,timeR);
+  const bal=(rr-rl)/Math.max(1e-6,(rr+rl));
+  
+  //gambiarra pra fazer o meter ficar indo pra um lado e pro outro mesmo com variação baixa
+  var bal_adjust = 0;
+  if(thumb_last_value > 0){
+    bal_adjust = bal + -3;
+    thumb_last_value = -1;
+  }else{
+    bal_adjust = bal + 3;
+    thumb_last_value = 1;
+  }
+
+
+  document.getElementById('balanceThumb').style.setProperty('--bal', bal_adjust.toFixed(3));
+
+  rafId = requestAnimationFrame(draw);
+}
+function startLoop(){ if (audioCtx && audioCtx.state==='suspended') audioCtx.resume(); draw(); }
+
+/* ======= Display, controles e SEEK ======= */
+const discBtn   = document.getElementById('discBtn');
+const filePick  = document.getElementById('filePick');
+const marqueeEl = document.getElementById('marquee');
+const cdTrackEl = document.getElementById('cdTrack');
+const timeNowEl = document.getElementById('timeNow');
+const timeTotEl = document.getElementById('timeTotal');
+
+const btnToggle  = document.getElementById('btnToggle');
+const toggleIcon = document.getElementById('toggleIcon');
+const btnStop    = document.getElementById('btnStop');
+const seekEl     = document.getElementById('seek');
+
+let currentTrack = 7;
+const totalTracks = 92;
+
+function mmss(t){ if(!isFinite(t)||t<0) t=0; const m=Math.floor(t/60), s=Math.floor(t%60); return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
+function updateCdTrack(){ cdTrackEl.textContent = `CD 13/${String(totalTracks).padStart(2,'0')} — TRACK ${String(currentTrack).padStart(2,'0')}`; }
+
+discBtn.addEventListener('click', ()=> filePick.click());
+filePick.addEventListener('change', e=>{
+  const file = e.target.files?.[0]; if(!file) return;
+  const name = file.name.replace(/\.[a-z0-9]+$/i,'').replace(/[_-]+/g,' ').trim();
+  marqueeEl.textContent = name || 'Audio Track';
+  marqueeEl.style.animation='none'; void marqueeEl.offsetWidth; marqueeEl.style.animation='';
+
+  audioEl.srcObject=null; audioEl.src=URL.createObjectURL(file);
+  audioEl.play().catch(()=>{});
+  currentTrack=((currentTrack)%totalTracks)+1; updateCdTrack();
+});
+
+/* Toggle Play/Pause (mesmo botão + troca de ícone) */
+btnToggle.addEventListener('click', ()=>{
+  if (audioEl.paused){ audioEl.play().catch(()=>{}); }
+  else { audioEl.pause(); }
+});
+btnStop.addEventListener('click', ()=>{
+  audioEl.pause(); audioEl.currentTime=0;
+});
+window.addEventListener('keydown', e=>{
+  if(e.code==='Space'){ e.preventDefault(); audioEl.paused ? audioEl.play().catch(()=>{}) : audioEl.pause(); }
+});
+
+/* Atualiza ícone e rotação do CD conforme estado */
+function setPlayingUI(playing){
+  toggleIcon.classList.toggle('fa-play', !playing);
+  toggleIcon.classList.toggle('fa-pause', playing);
+  cdIconEl.classList.toggle('spinning', playing);
+}
+audioEl.addEventListener('play', ()=>{
+  if (!audioCtx || !srcNode) connectElement();
+  setPlayingUI(true);
+});
+audioEl.addEventListener('pause', ()=> setPlayingUI(false));
+audioEl.addEventListener('ended', ()=> { setPlayingUI(false); });
+
+/* Tempo e SEEK */
+let seeking = false;
+function updateTime(){
+  const cur = audioEl.currentTime||0, dur = audioEl.duration||0;
+  timeNowEl.textContent = mmss(cur);
+  timeTotEl.textContent = mmss(dur);
+  // atualiza a barra se não estiver arrastando
+  if (!seeking && isFinite(dur) && dur>0){
+    seekEl.value = Math.round((cur/dur)*1000);
+  }
+  requestAnimationFrame(updateTime);
+}
+requestAnimationFrame(updateTime);
+
+// interação do seek
+seekEl.addEventListener('pointerdown', ()=> seeking = true);
+seekEl.addEventListener('pointerup',   ()=> seeking = false);
+seekEl.addEventListener('change', ()=>{
+  const dur = audioEl.duration||0;
+  if (isFinite(dur) && dur>0){
+    const ratio = Number(seekEl.value)/1000;
+    audioEl.currentTime = ratio * dur;
+  }
+});
+seekEl.addEventListener('input', ()=>{
+  const dur = audioEl.duration||0;
+  if (isFinite(dur) && dur>0){
+    const ratio = Number(seekEl.value)/1000;
+    audioEl.currentTime = ratio * dur;
+  }
+});
+
+/* init */
+updateCdTrack();
+</script>
+</body>
+</html>
